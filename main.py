@@ -5,7 +5,7 @@ todo core
 - support when game is end
 - support making a line: 3 horizon piece same value
 - support score
-- support input for variable board size
+x- support input for variable board size
 
 todo gravy
 - extend pieces shapes
@@ -17,7 +17,9 @@ todo gravy
 - refactor the properties . . .
 '''
 
+from ast import arg
 import random
+import sys
 
 
 class Tile:
@@ -150,9 +152,17 @@ class Game:
     board = None
     pending_block = None
     history = []
+    DEFAULT_BOARD_WIDTH = 5
+    DEFAULT_BOARD_HEIGHT = 5
 
-    def __init__(self, height, width) -> None:
-        self.board = Board(height,width)
+    def __init__(self, width=None, height=None) -> None:
+        
+        if not height or not width:
+            height = self.DEFAULT_BOARD_HEIGHT
+            width = self.DEFAULT_BOARD_WIDTH
+
+        self.board = Board(width, height)
+
 
     def start(self) -> None:
         print("game starting, reset timers...")
@@ -271,9 +281,13 @@ class Game:
         self.board.redraw()
 
 
-def main():
+def main(args = []):
 
-    game = Game(7,5)
+    # validate args
+    if len(args) == 3 and int(args[1]) > 0 and int(args[2]) > 0:
+        game = Game(int(args[1]), int(args[2]))
+    else:
+        game = Game()
 
     game.start()
 
@@ -293,4 +307,6 @@ def main():
         game_running = game.is_running()
 
 
-main()
+if __name__ == "__main__":
+    print("Starting local testing!")
+    main(sys.argv) 
