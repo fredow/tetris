@@ -2,7 +2,7 @@
 '''
 todo core
 x- support left and right arrow key
-- support when game is end
+x- support when game is end
 - support making a line: 3 horizon piece same value
 - support score
 x- support input for variable board size
@@ -19,10 +19,9 @@ todo cleanup
 - modularize the file
 '''
 
-from ast import arg
 import random
 import sys
-import curses
+import os
 
 from sshkeyboard import listen_keyboard, stop_listening
 
@@ -173,7 +172,40 @@ class Game:
         print("game starting, reset timers...")
 
 
+    def check_if_block_can_move(self):
+        
+        tile = self.pending_block.tile
+
+        # generate possible moves
+        possible_moves = [
+            self.board.tile(tile.y, tile.x - 1),
+            self.board.tile(tile.y, tile.x + 1),
+            self.board.tile(tile.y + 1, tile.x)
+        ]
+
+        current_piece_can_move = False
+        for destination in possible_moves:
+
+            if destination and destination.piece is None:
+                current_piece_can_move = True
+        
+        return current_piece_can_move
+
+    def is_game_finished(self):
+        
+        # check first if there is space left for new piece
+        no_more_space = True
+        for i in range(self.board.width):
+            if self.board.tile(0, i).piece is None:
+                no_more_space = False
+        
+        return no_more_space
+
+    # tries to generate new piece, returns None if impossible
     def generate_new_block(self):
+
+        if self.is_game_finished():
+            return False
 
         # generate a piece
         random.seed()
@@ -197,6 +229,11 @@ class Game:
         self.board.tile(0, pos).set_piece(piece)
 
         self.pending_block = piece
+        if self.pending_block is None:
+            print("new block " + str(piece))
+
+        self.redraw()
+        return True
 
     #def ask_user_move_callback(self, key):
         
@@ -209,10 +246,7 @@ class Game:
             stop_listening()
         
         while not move:    
-            
-            print("Use arrow to make your move (left or right) or press enter to skip")
             listen_keyboard(on_press=ask_user_move_callback)
-            print(self.input_buffer)
 
             if self.input_buffer in ["l", "left"]:
                 new_x = self.pending_block.tile.x + -1
@@ -220,18 +254,15 @@ class Game:
             elif self.input_buffer in ["r", "right"]:
                 new_x = self.pending_block.tile.x + 1
                 new_y = self.pending_block.tile.y + 0
-            elif self.input_buffer in ["enter", "esc"]:
+            elif self.input_buffer in ["enter", "esc", "down"]:
                 return Move(self.pending_block, self.pending_block.tile)
             else:
-                print("Illigale input. Please use LEFT or RIGHT arrows to move or press ENTER to skip")
                 continue
                     
             
             move_to_validate = Move(self.pending_block, self.board.tile(new_y, new_x))
             if self.board.validate_move(move_to_validate):
                 move = move_to_validate
-            else:
-                print("Illigale move. Nice try ")
 
         return move
 
@@ -245,9 +276,22 @@ class Game:
             self.board.tile(move.destination.y, move.destination.x).set_piece(move.piece)
             self.board.tile(y, x).set_piece(None)
             self.pending_block = move.piece
-            self.history.append(move)
-            self.board.redraw()
 
+            if self.pending_block is None:
+                print(move)
+            self.history.append(move)
+            self.redraw()
+
+    def check_if_gravity_ongoing(self):
+        
+        tile = self.pending_block.tile
+        next_destination = self.board.tile(tile.y + 1, tile.x)
+        if next_destination and next_destination.piece is None:
+            return True
+        else:
+            self.pending_block = None
+            return False
+        
 
     def apply_gravity(self):
         tile = self.pending_block.tile
@@ -256,16 +300,7 @@ class Game:
         if tile_destination and tile_destination.piece is None:
             move = Move(tile.piece, tile_destination)
             self.apply_move(move)
-
-            next_destination = self.board.tile(tile.y + 2, tile.x)
-            if next_destination and next_destination.piece is None:
-                return True
-
-
-        return False
-
         
-
 
     def apply_gravity_all(self):
 
@@ -282,17 +317,12 @@ class Game:
                         print("Gravity for " + str(y) + "," + str(x))
                         self.apply_move(move)
                         
-            # create move for each
-            # validate it
-            # move it
 
-
-
-    def is_running(self):
-        return True
 
     def redraw(self):
+        os.system('cls' if os.name == 'nt' else 'clear')
         self.board.redraw()
+        print("Use arrows to make your move (LEFT or RIGHT) or press ENTER (or DOWN) to skip")
 
 def main(args = []):
 
@@ -304,21 +334,28 @@ def main(args = []):
 
     game.start()
 
-    game_running = True
-    while game_running:
+    valid_turn = True
+    while valid_turn:
 
-        game.generate_new_block()
-        game.redraw()
+        block_was_created = game.generate_new_block()
 
-        gravity_space = True
-        while gravity_space:
+        if not block_was_created: 
+            break  #game finished
+        
+        gravity_ongoing = True
+        while gravity_ongoing:
 
-            move = game.ask_user_move()
-            game.apply_move(move)
-            gravity_space = game.apply_gravity()
+            gravity_ongoing = game.check_if_gravity_ongoing()
+            
+            if gravity_ongoing:
+                current_move = game.ask_user_move()
 
-        game_running = game.is_running()
+                if current_move is not None: 
+                    game.apply_move(current_move)
+                    game.apply_gravity() 
 
+
+    print("game done !")
 
 if __name__ == "__main__":
     print("Starting local testing!")
