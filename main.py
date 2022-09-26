@@ -1,7 +1,7 @@
 
 '''
 todo core
-- support left and right arrow key
+x- support left and right arrow key
 - support when game is end
 - support making a line: 3 horizon piece same value
 - support score
@@ -14,13 +14,17 @@ todo gravy
 - make the script as an executable
 - support multiplayer
 
-- refactor the properties . . .
+todo cleanup
+- refactor the OO properties 
+- modularize the file
 '''
 
 from ast import arg
 import random
 import sys
+import curses
 
+from sshkeyboard import listen_keyboard, stop_listening
 
 class Tile:
     x = 0
@@ -154,6 +158,7 @@ class Game:
     history = []
     DEFAULT_BOARD_WIDTH = 5
     DEFAULT_BOARD_HEIGHT = 5
+    input_buffer = None
 
     def __init__(self, width=None, height=None) -> None:
         
@@ -193,23 +198,32 @@ class Game:
 
         self.pending_block = piece
 
+    #def ask_user_move_callback(self, key):
+        
+
     def ask_user_move(self):
         move = None
-      
-        while not move:
 
-            move_raw = input("enter move: ")
+        def ask_user_move_callback(key):
+            self.input_buffer = key
+            stop_listening()
+        
+        while not move:    
+            
+            print("Use arrow to make your move (left or right) or press enter to skip")
+            listen_keyboard(on_press=ask_user_move_callback)
+            print(self.input_buffer)
 
-            if move_raw == "l":
+            if self.input_buffer in ["l", "left"]:
                 new_x = self.pending_block.tile.x + -1
                 new_y = self.pending_block.tile.y + 0
-            elif move_raw == "r":
+            elif self.input_buffer in ["r", "right"]:
                 new_x = self.pending_block.tile.x + 1
                 new_y = self.pending_block.tile.y + 0
-            elif move_raw == "":
+            elif self.input_buffer in ["enter", "esc"]:
                 return Move(self.pending_block, self.pending_block.tile)
             else:
-                print("Illigale input. Needs to be 'l' or 'r'")
+                print("Illigale input. Please use LEFT or RIGHT arrows to move or press ENTER to skip")
                 continue
                     
             
@@ -279,7 +293,6 @@ class Game:
 
     def redraw(self):
         self.board.redraw()
-
 
 def main(args = []):
 
