@@ -14,27 +14,43 @@ todo gravy
 - make the script as an executable
 - support multiplayer
 
-todo cleanup
+todo optimizations
 - refactor the OO properties 
+x- make everything typed
 - modularize the file
+- add linter and unit tests
 '''
 
 import random
 import sys
 import os
-
+from time import sleep
+from typing import List
 from sshkeyboard import listen_keyboard, stop_listening
 
+class Piece:
+    value: int = -1
+    tile = None #can't type it now, need to split in files and import before
+    name: str = ""
+
+    def __init__(self, v, t) -> None:
+        self.value = v
+        self.tile = t
+
+    def __str__(self) -> str:
+        raise NotImplementedError
+
 class Tile:
-    x = 0
-    y = 0
+    x: int = 0
+    y: int = 0
     piece = None
 
-    def __init__(self, y, x) -> None:
+    def __init__(self, y: int, x: int) -> None:
         self.x = x
         self.y = y
+        self.piece = None
 
-    def set_piece(self, p):
+    def set_piece(self, p: Piece):
         self.piece = p
 
         if self.piece is not None:
@@ -53,14 +69,6 @@ class Tile:
                 
         return False
 
-class Piece:
-    value = None
-    tile = None
-    name = ""
-    def __init__(self, v, t) -> None:
-        self.value = v
-        self.tile = t
-
 
 class TBD(Piece):
     def __init__(self, v, t) -> None:
@@ -77,32 +85,38 @@ class Square(Piece):
     def __str__(self) -> str:
         return "sq:" + str(self.value)
 
+class Move:
+    destination: Tile = None
+    piece: Piece = None
+
+    # to extend
+    def __init__(self, p, tile) -> None:
+        self.piece = p
+        self.destination = tile
+        pass
+
 
 class Board:
-
     
-    width = 5
-    height = 5
-    grid = []
-    def __init__(self, width, height):
+    width: int = 5
+    height: int = 5
+    grid: List = []
+
+    def __init__(self, width: int, height: int):
 
         self.width = width
         self.height = height
 
-        ui = ""
-        for y in range(0, height):
-            ui += "\n"
+        # mutable default
+        self.grid = []
+
+        for y in range(height):
             self.grid.append([])
             for x in range(0, width):
-                ui += "[" + str(y) + "," + str(x) + "]"
                 self.grid[y].append(Tile(y, x))
         
-        self.redraw()
 
-    #def tile(self, id):
-    #    return self.grid[id]
-
-    def tile(self, y, x):
+    def tile(self, y: int, x: int) -> Tile:
         
         if x >= 0 and x < self.width and y >= 0 and y < self.height:
             try:
@@ -111,7 +125,7 @@ class Board:
                 return None
         return None
 
-    def validate_move(self, move):
+    def validate_move(self, move: Move) -> bool:
 
         # validate if the board is free to move there first
         if move and move.destination and move.destination.piece is None:
@@ -140,39 +154,59 @@ class Board:
         print(ui)
 
 
-class Move:
-    destination = None
-    piece = None
-
-    # to extend
-    def __init__(self, p, tile) -> None:
-        self.piece = p
-        self.destination = tile  #tile
-        pass
-
-
 class Game:
-    board = None
-    pending_block = None
-    history = []
-    DEFAULT_BOARD_WIDTH = 5
-    DEFAULT_BOARD_HEIGHT = 5
-    input_buffer = None
+    board: List = None
+    pending_block: Piece = None
+    history: List = []
+    DEFAULT_BOARD_WIDTH: int = 5
+    DEFAULT_BOARD_HEIGHT: int = 5
+    input_buffer: str = ""
 
-    def __init__(self, width=None, height=None) -> None:
+    def __init__(self, width: int = DEFAULT_BOARD_WIDTH, height: int = DEFAULT_BOARD_HEIGHT) -> None:
         
         if not height or not width:
             height = self.DEFAULT_BOARD_HEIGHT
             width = self.DEFAULT_BOARD_WIDTH
 
+            # or randomize it...
+
+        # initialized defaults because of python mutable default behaviour
+        self.history = []
+        self.pending_block = None
+
         self.board = Board(width, height)
 
 
     def start(self) -> None:
-        print("game starting, reset timers...")
+        print("Get ready.")
+        sleep(1)
+        print("Get set...")
+        sleep(1)
+        print("GO!")
+        sleep(1)
+
+        valid_turn = True
+        while valid_turn:
+
+            block_was_created = self.generate_new_block()
+
+            if not block_was_created: 
+                break  #game finished
+            
+            gravity_ongoing = True
+            while gravity_ongoing:
+
+                gravity_ongoing = self.check_if_gravity_ongoing()
+                
+                if gravity_ongoing:
+                    current_move = self.ask_user_move()
+
+                    if current_move is not None: 
+                        self.apply_move(current_move)
+                        self.apply_gravity() 
 
 
-    def check_if_block_can_move(self):
+    def check_if_block_can_move(self) -> bool:
         
         tile = self.pending_block.tile
 
@@ -191,7 +225,7 @@ class Game:
         
         return current_piece_can_move
 
-    def is_game_finished(self):
+    def is_game_finished(self) -> bool:
         
         # check first if there is space left for new piece
         no_more_space = True
@@ -238,7 +272,7 @@ class Game:
     #def ask_user_move_callback(self, key):
         
 
-    def ask_user_move(self):
+    def ask_user_move(self) -> Move:
         move = None
 
         def ask_user_move_callback(key):
@@ -266,7 +300,7 @@ class Game:
 
         return move
 
-    def apply_move(self, move):
+    def apply_move(self, move: Move):
 
         # make change on the board here
         if move.destination.y != move.piece.tile.y or move.destination.x != move.piece.tile.x:
@@ -282,7 +316,7 @@ class Game:
             self.history.append(move)
             self.redraw()
 
-    def check_if_gravity_ongoing(self):
+    def check_if_gravity_ongoing(self) -> bool:
         
         tile = self.pending_block.tile
         next_destination = self.board.tile(tile.y + 1, tile.x)
@@ -320,43 +354,39 @@ class Game:
 
 
     def redraw(self):
-        os.system('cls' if os.name == 'nt' else 'clear')
+        clear_terminal()
         self.board.redraw()
         print("Use arrows to make your move (LEFT or RIGHT) or press ENTER (or DOWN) to skip")
 
+def clear_terminal():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+
 def main(args = []):
 
-    # validate args
+    width = None
+    height = None
     if len(args) == 3 and int(args[1]) > 0 and int(args[2]) > 0:
-        game = Game(int(args[1]), int(args[2]))
-    else:
-        game = Game()
-
-    game.start()
-
-    valid_turn = True
-    while valid_turn:
-
-        block_was_created = game.generate_new_block()
-
-        if not block_was_created: 
-            break  #game finished
+        width = int(args[1])
+        height = int(args[1])
         
-        gravity_ongoing = True
-        while gravity_ongoing:
 
-            gravity_ongoing = game.check_if_gravity_ongoing()
-            
-            if gravity_ongoing:
-                current_move = game.ask_user_move()
+    while True:
+        game = Game(width, height)
+        game.start()
+        
+        print("Game done!")
+        key = input("Want to play another one? (Y/n) ")
 
-                if current_move is not None: 
-                    game.apply_move(current_move)
-                    game.apply_gravity() 
+        if key == "y" or key == "Y" or key == "":
+            continue
 
+        break
 
-    print("game done !")
+    print("Thank you for playing :)")
 
 if __name__ == "__main__":
-    print("Starting local testing!")
+    print("###############################\n#  Welcome to Tetris v0.1 :)  #\n###############################")
+    input("\nPress any key to start the game..")
+    clear_terminal()
     main(sys.argv) 

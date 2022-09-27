@@ -7,3 +7,8 @@ see: https://stackoverflow.com/questions/24072790/how-to-detect-key-presses/5764
 - keyboard library requires root
 - Tkinter requires additionnal linux installation
 - curses requires new shell and blocks execution
+
+<script src="http://code.jquery.com/jquery-1.4.2.min.js"></script>
+<script>
+alert("testing")
+</script>
