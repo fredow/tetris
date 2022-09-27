@@ -12,7 +12,10 @@ todo gravy
 - support replay back of the game
 - turn base to real time by using threads 
 - make the script as an executable
+    https://datatofish.com/executable-pyinstaller/
 - support multiplayer
+- have a menu with : size of board, new game, share etc
+- show timer in real time
 
 todo optimizations
 - refactor the OO properties 
@@ -100,7 +103,7 @@ class Board:
     
     width: int = 5
     height: int = 5
-    grid: List = []
+    grid: List = [int]
 
     def __init__(self, width: int, height: int):
 
@@ -144,23 +147,23 @@ class Board:
 
         ui = ""
         for y in range(len(self.grid)):
-            ui += "\n"
             for x in range(len(self.grid[y])):
                 if coords:
                     ui += "[" + str(y) + "," + str(x) + "]"
                 else:
                     ui += str(self.tile(y,x))
-        
+            ui += "\n"
         print(ui)
 
 
 class Game:
     board: List = None
     pending_block: Piece = None
-    history: List = []
+    history: List = [Move]
     DEFAULT_BOARD_WIDTH: int = 5
     DEFAULT_BOARD_HEIGHT: int = 5
     input_buffer: str = ""
+    score: int = 0
 
     def __init__(self, width: int = DEFAULT_BOARD_WIDTH, height: int = DEFAULT_BOARD_HEIGHT) -> None:
         
@@ -173,7 +176,7 @@ class Game:
         # initialized defaults because of python mutable default behaviour
         self.history = []
         self.pending_block = None
-
+        self.score = 0
         self.board = Board(width, height)
 
 
@@ -199,12 +202,48 @@ class Game:
                 gravity_ongoing = self.check_if_gravity_ongoing()
                 
                 if gravity_ongoing:
-                    current_move = self.ask_user_move()
+                    user_move = self.ask_user_move()
 
-                    if current_move is not None: 
-                        self.apply_move(current_move)
-                        self.apply_gravity() 
+                    if user_move is not None: 
+                        self.apply_move(user_move)
+                        auto_move = self.apply_gravity() 
 
+                else:
+                    if self.history[-1] is not None:
+                        self.evaluate_score(self.history[-1])
+
+    
+    # take the last move played, and check if there is some points
+    # if so, remove the full line and make blocks fall
+    def evaluate_score(self, move: Move):
+        row_to_evaluate = move.destination.y
+
+        row_filled = True
+        for i in range(self.board.width):
+            tile = self.board.tile(row_to_evaluate, i)
+            if tile and tile.piece is None:
+                row_filled = False
+                break
+
+        
+        if row_filled:
+            self.score += self.board.width
+
+            # O(N) instead of O(n2) by this trick, todo: would work if it was not objects
+            #top_line = [0] * self.board.width
+            #new_arr = [top_line] + self.board.grid[0:-1]
+            #self.board.grid = new_arr
+
+            # move all the piece down 1 row, delete the last row pieces and initialize the first row
+            for y in range(self.board.height -1, -1, -1):
+                for x in range(self.board.width):
+                    if row_to_evaluate == y:
+                        del self.board.tile(y, x).piece
+
+                    if y == 0:
+                        self.board.tile(y, x).piece = None
+                    else:
+                        self.board.tile(y, x).piece = self.board.tile(y - 1, x).piece                
 
     def check_if_block_can_move(self) -> bool:
         
@@ -327,14 +366,16 @@ class Game:
             return False
         
 
-    def apply_gravity(self):
+    def apply_gravity(self) -> Move:
         tile = self.pending_block.tile
         tile_destination = self.board.tile(tile.y + 1, tile.x)
 
+        move = None
         if tile_destination and tile_destination.piece is None:
             move = Move(tile.piece, tile_destination)
             self.apply_move(move)
         
+        return move
 
     def apply_gravity_all(self):
 
@@ -355,6 +396,7 @@ class Game:
 
     def redraw(self):
         clear_terminal()
+        print("Score: " + str(self.score))
         self.board.redraw()
         print("Use arrows to make your move (LEFT or RIGHT) or press ENTER (or DOWN) to skip")
 
@@ -362,14 +404,19 @@ def clear_terminal():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 
-def main(args = []):
+def main(args = [str]):
 
+    
     width = None
     height = None
     if len(args) == 3 and int(args[1]) > 0 and int(args[2]) > 0:
         width = int(args[1])
         height = int(args[1])
         
+    clear_terminal()
+    print("###############################\n#  Welcome to Tetris v0.1 :)  #\n###############################")
+    input("\nPress any key to start the game..")
+    clear_terminal()
 
     while True:
         game = Game(width, height)
@@ -385,8 +432,6 @@ def main(args = []):
 
     print("Thank you for playing :)")
 
+
 if __name__ == "__main__":
-    print("###############################\n#  Welcome to Tetris v0.1 :)  #\n###############################")
-    input("\nPress any key to start the game..")
-    clear_terminal()
     main(sys.argv) 
