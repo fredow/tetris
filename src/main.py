@@ -1,6 +1,6 @@
 import sys
 
-import utils
+import utils as utils
 from game import Game
 
 
