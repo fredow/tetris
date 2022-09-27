@@ -37,7 +37,7 @@ class Triangle(Piece):
 
 class PieceFactory():
     
-    # todo: circle dependency with Piece, to type or remove
+    # todo: circle dependency with Piece, to type or remove, see https://stackoverflow.com/questions/7336802/how-to-avoid-circular-imports-in-python
     def build(value: int, tile):
         try:
             if value == 1:
