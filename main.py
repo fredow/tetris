@@ -145,7 +145,7 @@ class Board:
 
     def redraw(self, coords = False):
 
-        ui = ""
+        ui: str = ""
         for y in range(len(self.grid)):
             for x in range(len(self.grid[y])):
                 if coords:
@@ -188,13 +188,10 @@ class Game:
         print("GO!")
         sleep(1)
 
-        valid_turn = True
-        while valid_turn:
+        game_ongoing = True
+        while game_ongoing:
 
-            block_was_created = self.generate_new_block()
-
-            if not block_was_created: 
-                break  #game finished
+            self.generate_new_block()
             
             gravity_ongoing = True
             while gravity_ongoing:
@@ -206,19 +203,23 @@ class Game:
 
                     if user_move is not None: 
                         self.apply_move(user_move)
-                        auto_move = self.apply_gravity() 
+                        self.apply_gravity() 
 
                 else:
-                    if self.history[-1] is not None:
-                        self.evaluate_score(self.history[-1])
+
+                    # apply score
+                    self.evaluate_score(self.history[-1])
+
+                    # check if game finish
+                    game_ongoing = not self.is_game_finished()
 
     
     # take the last move played, and check if there is some points
     # if so, remove the full line and make blocks fall
     def evaluate_score(self, move: Move):
-        row_to_evaluate = move.destination.y
+        row_to_evaluate: int = move.destination.y
 
-        row_filled = True
+        row_filled: bool = True
         for i in range(self.board.width):
             tile = self.board.tile(row_to_evaluate, i)
             if tile and tile.piece is None:
@@ -266,19 +267,16 @@ class Game:
 
     def is_game_finished(self) -> bool:
         
-        # check first if there is space left for new piece
-        no_more_space = True
+        # check if the row 0 (top) contains one piece, if yes then it's over
+        game_over = False
         for i in range(self.board.width):
-            if self.board.tile(0, i).piece is None:
-                no_more_space = False
+            if self.board.tile(0, i).piece is not None:
+                game_over = True
         
-        return no_more_space
+        return game_over
 
     # tries to generate new piece, returns None if impossible
     def generate_new_block(self):
-
-        if self.is_game_finished():
-            return False
 
         # generate a piece
         random.seed()
@@ -434,4 +432,4 @@ def main(args = [str]):
 
 
 if __name__ == "__main__":
-    main(sys.argv) 
+    main(sys.argv) # *args
