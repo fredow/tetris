@@ -1,35 +1,25 @@
 # native libraries
+import copy
 import random
 from time import sleep
-from typing import List #, Set, Dict, Tuple, Optional
+from typing import List
 
 # installed libraries
 from sshkeyboard import listen_keyboard, stop_listening
 
 # app dependencies
 from pieces import Piece, PieceFactory
-from board import Board, Tile
+from board import Board
+from move import Move, MoveFactory
+import numpy as np
 import utils
-
-
-class Move:
-    destination: Tile = None
-    piece: Piece = None
-
-    # to extend
-    def __init__(self, p, tile) -> None:
-        self.piece = p
-        self.destination = tile
-        pass
-
-
 
 class Game:
     board: Board = None
-    pending_block: Piece = None
+    pending_piece: Piece = None
     history: List[Move] = []
-    DEFAULT_BOARD_WIDTH: int = 5
-    DEFAULT_BOARD_HEIGHT: int = 5
+    DEFAULT_BOARD_WIDTH: int = 10
+    DEFAULT_BOARD_HEIGHT: int = 22
     input_buffer: str = ""
     score: int = 0
 
@@ -43,7 +33,7 @@ class Game:
 
         # initialized defaults because of python mutable default behaviour
         self.history = []
-        self.pending_block = None
+        self.pending_piece = None
         self.score = 0
         self.board = Board(width, height)
 
@@ -59,149 +49,176 @@ class Game:
         game_ongoing = True
         while game_ongoing:
 
-            self.generate_new_block()
+            success = self.generate_new_block()
             
-            gravity_ongoing = True
+            if not success: break
+            gravity_ongoing = self.check_if_gravity_ongoing()
+
             while gravity_ongoing:
 
-                gravity_ongoing = self.check_if_gravity_ongoing()
-                
-                if gravity_ongoing:
-                    user_move = self.ask_user_move()
+                user_move = self.ask_user_move()
 
-                    if user_move is not None: 
-                        self.apply_move(user_move)
-                        self.apply_gravity() 
+                if isinstance(user_move, Move): 
 
-                else:
+                    gravity_ongoing = self.check_if_gravity_ongoing(apply_if_possible=True)
 
-                    # apply score
-                    self.evaluate_score(self.history[-1])
 
-                    # check if game finish
-                    game_ongoing = not self.is_game_finished()
+            # apply score
+            self.evaluate_score(self.history[-1])
+
+            # check if game finish
+            game_ongoing = not self.is_game_finished()
+            if not game_ongoing:
+                print("ending")
 
     
     # take the last move played, and check if there is some points
     # if so, remove the full line and make blocks fall
     def evaluate_score(self, move: Move):
-        row_to_evaluate: int = move.destination.y
+        if move.destination_position is None:
+            row_to_evaluate: int = len(move.piece_shape) - 1
+        else:
+            row_to_evaluate: int = move.destination_position[0] + len(move.piece_shape) - 1
 
+        BUFFER  =1
         row_filled: bool = True
-        for i in range(self.board.width):
+        for i in range(1, self.board.width):
             tile = self.board.tile(row_to_evaluate, i)
-            if tile and tile.piece is None:
+            if tile and tile.block is None:
                 row_filled = False
                 break
 
         
         if row_filled:
-            self.score += move.piece.value
+            self.score += self.pending_piece.color
 
             # O(N) instead of O(n2) by this trick, todo: would work if it was not objects
             #top_line = [0] * self.board.width
             #new_arr = [top_line] + self.board.grid[0:-1]
             #self.board.grid = new_arr
+            
+            for x in range(BUFFER, self.board.width + BUFFER):
+                t = self.board.tile(row_to_evaluate, x)
+                if t is not None:
+                    if t.block is not None:
+                        del t.block
+                        t.block = None
 
             # move all the piece down 1 row, delete the last row pieces and initialize the first row
-            for y in range(self.board.height -1, -1, -1):
-                for x in range(self.board.width):
-                    if row_to_evaluate == y:
-                        del self.board.tile(y, x).piece
+            if row_to_evaluate > 0:
+                for y in range(row_to_evaluate, BUFFER, -1):
+                    for x in range(BUFFER, self.board.width + BUFFER):
+                        self.board.tile(y, x).block = self.board.tile(y - 1, x).block                
 
-                    if y == 0:
-                        self.board.tile(y, x).piece = None
-                    else:
-                        self.board.tile(y, x).piece = self.board.tile(y - 1, x).piece                
-
-    def check_if_block_can_move(self) -> bool:
-        
-        tile = self.pending_block.tile
-
-        # generate possible moves
-        possible_moves = [
-            self.board.tile(tile.y, tile.x - 1),
-            self.board.tile(tile.y, tile.x + 1),
-            self.board.tile(tile.y + 1, tile.x)
-        ]
-
-        current_piece_can_move = False
-        for destination in possible_moves:
-
-            if destination and destination.piece is None:
-                current_piece_can_move = True
-        
-        return current_piece_can_move
 
     def is_game_finished(self) -> bool:
         
         # check if the row 0 (top) contains one piece, if yes then it's over
         game_over = False
+        BUFFER = 1
         for i in range(self.board.width):
-            if self.board.tile(0, i).piece is not None:
+            t = self.board.tile(1, i)
+            if t and t.block is not None:
                 game_over = True
         
         return game_over
 
-    # tries to generate new piece, returns None if impossible
+    '''
+    generates a random piece at (0,0)
+    randomly move it on the x axis
+    if the move is illigale it means the game is done
+    '''
     def generate_new_block(self):
 
-        # generate a piece
+        #todo: will force a gap of 4 from the right which for the square will never allow it to be at the boarder
         random.seed()
-        r = random.randint(1, 4)
-
-        # generate a random position from the top
-        pos = -1
-        attempts = 0
-        while pos == -1 and attempts < 100:
-            pos = random.randint(0, self.board.width - 1)
-
-            if self.board.tile(0, pos).piece is not None:
-                pos = -1
-                attempts += 1
-
-        piece = PieceFactory.build(r, self.board.tile(0, pos)) #y, x
-
-        self.board.tile(0, pos).set_piece(piece)
-
-        self.pending_block = piece
-        if self.pending_block is None:
-            print("new block " + str(piece))
-
-        self.redraw()
-        return True
-
-    #def ask_user_move_callback(self, key):
+        # BUFFER
+        pos_x = random.randint(1, self.board.width - 5) 
+        #pos_x = 4
+        matrix = self.board.get_matrix()
+        self.pending_piece = PieceFactory.build_rand()
         
+        move = MoveFactory.build_first(
+            self.pending_piece.vector,
+            matrix, 
+            [1, pos_x]
+        )
+
+        # align the piece matrix with the random new position
+        valid = self.board.verify_state(move.new_board_state)
+
+        if valid:
+
+            #self.board.update_blocks_positions(
+            #    self.pending_piece, 
+            #    move.new_piece_positions
+            #)
+            self.commit_and_redraw(move)
+            
+            self.redraw()
+
+            return True
+        else:
+            self.redraw()
+            # todo: to support and test
+            return False
+
+            '''
+            initiate out of bounds to -2
+            if one of them has value of 2, illigale (on top of another piece)
+            if one of them has a value out of bound of -1, illigate
+            otherwise 
+            '''
+
 
     def ask_user_move(self) -> Move:
-        move = None
+        move: Move = None
 
         def ask_user_move_callback(key):
             self.input_buffer = key
             stop_listening()
         
-        while not move:    
+        played: bool = False
+        while not played:    
             listen_keyboard(on_press=ask_user_move_callback)
 
-            if self.input_buffer in ["l", "left"]:
-                new_x = self.pending_block.tile.x + -1
-                new_y = self.pending_block.tile.y + 0
-            elif self.input_buffer in ["r", "right"]:
-                new_x = self.pending_block.tile.x + 1
-                new_y = self.pending_block.tile.y + 0
-            elif self.input_buffer in ["enter", "esc", "down"]:
-                return Move(self.pending_block, self.pending_block.tile)
-            else:
+            current_piece_coords = self.pending_piece.get_matrix_from_blocks()
+            m = MoveFactory.build(
+                    self.input_buffer,
+                    self.pending_piece.vector,
+                    current_piece_coords[0])
+
+            if not isinstance(m, Move):
+                print("command not supported")
                 continue
-                    
-            
-            move_to_validate = Move(self.pending_block, self.board.tile(new_y, new_x))
-            if self.validate_move(move_to_validate):
-                move = move_to_validate
 
-        return move
+            # check if this is a legal movement for the piece
+            if m.get_matrice() in self.pending_piece.get_possible_moves():
+                
+                # now try to apply the move and check if board is in a valid state
+                state = m.apply_command(self.board.get_matrix())
+                valid = self.board.verify_state(m.new_board_state)
 
+                if valid:
+                    # commit the move on the board now
+                    # input: coords piece A, coords piece B
+                    #self.board.update_blocks_positions(
+                    #    self.pending_piece, 
+                    #    m.new_piece_positions
+                    #)
+                    self.commit_and_redraw(m)
+
+                    return m
+                else:
+                    print("out of bound!")
+
+            else:
+                print("Illigal move!")
+
+                
+
+    '''
+    @depreciated
     def validate_move(self, move: Move) -> bool:
 
         # validate if the board is free to move there first
@@ -214,9 +231,10 @@ class Game:
                 if abs(move.destination.x - move.piece.tile.x) == 1:
                     return True
 
-        return False
+        return False'''
 
-    def apply_move(self, move: Move):
+    #@depreciated
+    '''def apply_move(self, move: Move):
 
         # make change on the board here
         if move.destination.y != move.piece.tile.y or move.destination.x != move.piece.tile.x:
@@ -225,26 +243,59 @@ class Game:
             y = move.piece.tile.y
             self.board.tile(move.destination.y, move.destination.x).set_piece(move.piece)
             self.board.tile(y, x).set_piece(None)
-            self.pending_block = move.piece
+            self.pending_piece = move.piece
 
-            if self.pending_block is None:
+            if self.pending_piece is None:
                 print(move)
             self.history.append(move)
             self.redraw()
-
-    def check_if_gravity_ongoing(self) -> bool:
+    '''
+    
+    def commit_and_redraw(self, move: Move):
         
-        tile = self.pending_block.tile
+        for b in self.pending_piece.blocks:
+            if b.tile is not None: b.tile.block = None
+
+        coords = move.get_vector_coords()
+        for i, c in enumerate(coords):
+            tile = self.board.tile(c[0], c[1])
+            self.pending_piece.blocks[i].tile = tile
+            tile.block = self.pending_piece.blocks[i]
+    
+        self.history.append(move)
+        self.redraw()
+
+    def check_if_gravity_ongoing(self, apply_if_possible = False) -> bool:
+        
+        g = MoveFactory.build(
+            "down", 
+            self.pending_piece.vector,
+            self.pending_piece.get_matrix_from_blocks()[0]
+        )
+
+        current_state = self.board.get_matrix()
+        g.apply_command(current_state)
+
+        is_valid = self.board.verify_state(g.new_board_state)
+
+        if apply_if_possible and is_valid:
+            self.commit_and_redraw(g)
+
+            return self.check_if_gravity_ongoing()
+        else:
+            return is_valid
+        
+        '''tile = self.pending_piece.tile
         next_destination = self.board.tile(tile.y + 1, tile.x)
         if next_destination and next_destination.piece is None:
             return True
         else:
-            self.pending_block = None
+            self.pending_piece = None
             return False
-        
+        '''
 
     def apply_gravity(self) -> Move:
-        tile = self.pending_block.tile
+        tile = self.pending_piece.tile
         tile_destination = self.board.tile(tile.y + 1, tile.x)
 
         move = None
@@ -254,6 +305,7 @@ class Game:
         
         return move
 
+    '''
     def apply_gravity_all(self):
 
         tile_applied_gravity = []
@@ -268,7 +320,7 @@ class Game:
                         tile_applied_gravity.append(tile_destination)
                         print("Gravity for " + str(y) + "," + str(x))
                         self.apply_move(move)
-                        
+    '''                    
 
 
     def redraw(self):

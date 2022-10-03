@@ -1,3 +1,9 @@
+LIVE TODO
+- beef up the vector command before applying it to the matrice : use the same way
+- dont forget that the vector was already beefed up so 0,0 axis need to be taken care of
+
+
+
 # Text-based Tetris 
 
 Just playing around to brush-up my python :]
@@ -38,3 +44,14 @@ Technical improvements
     - keyboard() library requires root permission
     - Tkinter() requires additionnal linux installation
     - curses() requires new shell and blocks execution
+
+design decision on tile vs matrice
+OO Design
+- Move 
+patterns
+- command pattern: Move
+- singleton
+- factory building
+
+todo
+- read https://www.python.org/dev/peps/pep-0557/#post-init-processing
