@@ -93,9 +93,12 @@ class Move (ABC):
         # update global states
         # todo: problem with rotation for the o        self.new_board_state = np.array(beefedup_vector) + np.array(matrix)        self.destination_position = np.array(self.initial_position) + self.get_matrice()
         self.new_board_state = matrix + beefedup_vector
-        self.destination_position = np.array(self.initial_position) + self.get_matrice()
-
-
+        
+        self.destination_position = np.array(self.initial_position)
+        pivot_point_translation = self.get_matrice()
+        if pivot_point_translation:
+            self.destination_position += self.get_matrice()
+            
         return self.new_board_state
 
     def undo_command(self, vector=None):
@@ -126,34 +129,32 @@ class Move (ABC):
     
     
     '''
-    def calculate_vector(self):
 
-        y_len = len(self.piece_shape)
-        x_len = len(self.piece_shape[0])
-
-        move = self.get_matrice()
+    def add_padding_matrix(self, matrix):
 
         # beef up matrice + 1 top and bottom and + 1 left and right
-        beefed_upmatrix = np.vstack([[[0] * x_len], self.piece_shape])
-        beefed_upmatrix = np.vstack([beefed_upmatrix, [[0] * x_len]])
+        beefed_upmatrix = np.vstack([[[0] * len(matrix[0])], matrix])
+        beefed_upmatrix = np.vstack([beefed_upmatrix, [[0] * len(matrix[0])]])
         
         beefed_upmatrix = np.column_stack([[0] * len(beefed_upmatrix), beefed_upmatrix])
         beefed_upmatrix = np.column_stack([beefed_upmatrix, [0] * len(beefed_upmatrix)])
 
+        return beefed_upmatrix
+
+    def calculate_vector(self, beefed_upmatrix):
+
         # create transformation matrix
+        move = self.get_matrice()
         coords = np.transpose(np.where(beefed_upmatrix==1))
         transformation_matrix = beefed_upmatrix.copy()
         transformation_matrix[np.where(transformation_matrix==1)] = 0
 
         # for each coords that cointain a block, apply the move 
-        
         for point in coords:
             transformation_matrix[point[0] + move[0]][point[1] + move[1]] += 1
             transformation_matrix[point[0]][point[1]] -= 1
-        # apply
         
         self.move_vector_command = transformation_matrix
-        #print(self.move_vector_command)
 
 
     #fill the matrix based to match it with an existing one

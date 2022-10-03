@@ -24,12 +24,14 @@ class MoveFactory():
         elif move_str in ["enter", "esc", "down"]:
             move = DownMove(piece_shape, initial_position) 
         elif move_str == "up":
-            print("Rotation available soon...")
             return None
+            #move = RotateMove(piece_shape, initial_position)
         else:
             return None
 
-        move.calculate_vector()
+        padded_matrix = move.add_padding_matrix(move.piece_shape)
+        
+        move.calculate_vector(padded_matrix)
 
         return move
 

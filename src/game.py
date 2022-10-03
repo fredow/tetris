@@ -60,18 +60,18 @@ class Game:
         while self.game_ongoing:
 
             gravity_ongoing = True
-            while gravity_ongoing:
+            while gravity_ongoing and self.game_ongoing:
                 try:
                     self.ask_user_move()
-                except Exception:
-                    print("Please wait till a new piece spawns")
+                except Exception as e:
+                    pass #print("Please wait till a new piece spawns")
 
 
 
 
     def game_timer(self):
         while self.game_ongoing:
-            sleep(1)
+            
             if self.pending_piece is None:
                 self.generate_new_block()
                 
@@ -83,7 +83,8 @@ class Game:
 
                 self.game_ongoing = not self.is_game_finished()
                 
-            self.redraw()
+            #self.redraw()
+            sleep(1)
 
     
     # take the last move played, and check if there is some points
@@ -166,7 +167,10 @@ class Game:
             stop_listening()
         
         played: bool = False
-        while not played:    
+        while not played:   
+
+            # todo: edge case when game done, but we are waiting for keyboard... 
+            #   we need to find a way to kill this thread when it happens            
             listen_keyboard(on_press=ask_user_move_callback)
 
             # special case: revert

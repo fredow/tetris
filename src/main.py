@@ -42,11 +42,10 @@ def main(args = [str]):
 
         game_runner.join()
         game_timer.join()
-        
-        print(11111)
+        sleep(1)
         
         #game_controller.join()
-        print("Game done!")
+        print("\n###############################\nGame done! Score: "+ str(game.score) +"\n###############################")
         key = input("Want to play another one? Press ENTER to play again")
 
         if key == "y" or key == "Y" or key == "":

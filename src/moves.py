@@ -41,13 +41,29 @@ class MoveOrigin(Move):
 
 class RotateMove(Move):
     CONTROL = "up"
-    # special case
+    
+    # override
+    def calculate_vector(self, shape):
+
+
+        rot = np.rot90(shape)
+
+        # beef up the number of rows to make them match
+        if len(rot) - len(shape) > 0:
+            shape = np.vstack([shape, [0] * len(shape[0])])
+        else:
+            rot = np.vstack([rot, [0] * len(rot[0])])
+
+        if len(rot[0]) - len(shape[0]) > 0:
+            shape = np.column_stack([shape, [0] * len(shape)])
+        else:
+            rot = np.column_stack([rot, [0] * len(rot)])
+
+        self.move_vector_command = rot - shape
+        return self.move_vector_command
+
     def get_matrice(self):
-        return [] 
-
-
-    def apply(self) -> bool:
-        return np.rot90(self.curr_matrice)
+        return []
 
     def rollback(self, updated_coords):
         return np.rot90(updated_coords, 3)
