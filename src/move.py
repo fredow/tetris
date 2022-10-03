@@ -6,7 +6,6 @@ from typing import List
 
 BOARD_PADDING = 1
 
-
 # must be serializable and the most decoupled
 #@dataclass
 class Move (ABC):
@@ -34,6 +33,9 @@ class Move (ABC):
         self.destination_position = None
     
 
+    #@abstractmethod
+    def custom_rollback(self):
+        ...
 
     @abstractmethod
     def get_matrice(self) -> List[int]:
@@ -45,8 +47,9 @@ class Move (ABC):
         reversed_state = self.apply_command(self.new_board_state, move_vector_command)
 
         self.destination_position = np.array(self.initial_position)
-        #if isinstance(self, MoveOrigin):
-            
+        
+        # template pattern for children specific ops
+        self.custom_rollback()    
 
         return reversed_state
 
@@ -69,6 +72,9 @@ class Move (ABC):
         if matrix is None:
             matrix = self.initial_board_state
 
+        if self.CONTROL == "origin":
+            print(222)
+
         # beef up the calculated vector with the actual bord to be able to do ops
         beefedup_vector = vector
         if piece_position[0] - BOARD_PADDING > 0:
@@ -85,9 +91,9 @@ class Move (ABC):
                 beefedup_vector = np.column_stack([beefedup_vector, [0] * len(beefedup_vector)])
         
         # update global states
-        # todo: problem with rotation for the o        self.new_board_state = np.array(beefedup_vector) + np.array(matrix)
-        self.destination_position = np.array(self.initial_position) + self.get_matrice()
+        # todo: problem with rotation for the o        self.new_board_state = np.array(beefedup_vector) + np.array(matrix)        self.destination_position = np.array(self.initial_position) + self.get_matrice()
         self.new_board_state = matrix + beefedup_vector
+        self.destination_position = np.array(self.initial_position) + self.get_matrice()
 
 
         return self.new_board_state
@@ -175,79 +181,3 @@ class Move (ABC):
 
         self.move_vector_command = extended_matrix
 
-
-class LeftMove(Move):
-    def get_matrice(self):
-        return [0, -1]
-
-class RightMove(Move):
-    def get_matrice(self):
-        return [0, 1]
-
-class DownMove(Move):
-    def get_matrice(self):
-        return [1, 0]
-
-
-
-class RotateMove(Move):
-
-    # special case
-    def get_matrice(self):
-        return [] 
-
-
-    def apply(self) -> bool:
-        return np.rot90(self.curr_matrice)
-
-    def rollback(self, updated_coords):
-        return np.rot90(updated_coords, 3)
-
-   
-'''
-we need 
-- the vector of the piece and its 0,0 or a list of its coords
-- current map
-- vector to appply
-
-we process it by
-- trasfoming the 0----0 -> 00---- 
-- appling 
-
-
-'''
-class MoveFactory():
-    def build(move_str: str, piece_shape: List, initial_position):
-    
-        move = None
-        if move_str == "left":
-            move = LeftMove(piece_shape, initial_position)
-        elif move_str == "right":
-            move = RightMove(piece_shape, initial_position)
-        elif move_str in ["enter", "esc", "down"]:
-            move = DownMove(piece_shape, initial_position) 
-        elif move_str == "up":
-            print("Rotation available soon...")
-            return None
-        else:
-            return None
-
-        move.calculate_vector()
-
-        return move
-
-    def build_first(piece_shape: List, state: List, initial_position: List[int]):
-        
-        move = MoveOrigin(piece_shape, state, initial_position)
-        move.calculate_vector_first()
-        move.apply_command_first(state)
-
-        return move
-
-        '''try:
-            for m in MoveFactory.possible_moves:
-                if m.matrice == matrice:
-                    return m()
-        except AssertionError as e:
-            print(e)
-        '''

@@ -1,6 +1,6 @@
 from typing import List
-from dataclasses import dataclass
 from move import Move
+from moves import MoveOrigin
 
 
 class MoveHistory:
@@ -14,9 +14,10 @@ class MoveHistory:
         self.history.append(move)
 
     # not allowed to rollback the first move
-    # todo: should also forbid this for every new piece
+    # stops the rollback until the piece was created
     def pop(self):
-        if len(self.history) > 1: 
+        move = self.last()
+        if move and not isinstance(move, MoveOrigin):
             return self.history.pop()
         else:
             return None

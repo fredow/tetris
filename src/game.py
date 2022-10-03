@@ -12,13 +12,17 @@ from sshkeyboard import listen_keyboard, stop_listening
 # app dependencies
 from pieces import Piece, PieceFactory
 from board import Board
-from move import Move, MoveFactory
+from move import Move
+from move_factory import MoveFactory
 import numpy as np
 from stack import MoveHistory
 import utils
 
 BUFFER = 1
 class Game:
+    
+    POINTS_PER_LINE = 100
+    
     board: Board = None
     pending_piece: Piece = None
     history: MoveHistory = None
@@ -52,12 +56,16 @@ class Game:
         self.game_ongoing = True
 
     def game_runner(self):
-
+        self.redraw()
         while self.game_ongoing:
 
             gravity_ongoing = True
             while gravity_ongoing:
-                self.ask_user_move()
+                try:
+                    self.ask_user_move()
+                except Exception:
+                    print("Please wait till a new piece spawns")
+
 
 
 
@@ -95,7 +103,7 @@ class Game:
 
         
         if row_filled:
-            self.score += self.pending_piece.color
+            self.score += self.POINTS_PER_LINE
 
             for x in range(BUFFER, self.board.width + BUFFER):
                 t = self.board.tile(row_to_evaluate, x)
