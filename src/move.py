@@ -82,8 +82,7 @@ class Move (ABC):
                 beefedup_vector = np.column_stack([beefedup_vector, [0] * len(beefedup_vector)])
         
         # update global states
-        # todo: problem with rotation for the origin?
-        self.new_board_state = np.array(beefedup_vector) + np.array(matrix)
+        # todo: problem with rotation for the o        self.new_board_state = np.array(beefedup_vector) + np.array(matrix)
         self.destination_position = np.array(self.initial_position) + self.get_matrice()
         
 

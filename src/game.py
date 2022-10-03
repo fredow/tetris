@@ -12,13 +12,14 @@ from pieces import Piece, PieceFactory
 from board import Board
 from move import Move, MoveFactory
 import numpy as np
+from stack import MoveHistory
 import utils
 
 BUFFER = 1
 class Game:
     board: Board = None
     pending_piece: Piece = None
-    history: List[Move] = []
+    history: MoveHistory = None
     DEFAULT_BOARD_WIDTH: int = 10
     DEFAULT_BOARD_HEIGHT: int = 22
     input_buffer: str = ""
@@ -33,7 +34,7 @@ class Game:
             # or randomize it...
 
         # initialized defaults because of python mutable default behaviour
-        self.history = []
+        self.history = MoveHistory()
         self.pending_piece = None
         self.score = 0
         self.board = Board(width, height)
@@ -65,7 +66,7 @@ class Game:
 
 
             # apply score
-            self.evaluate_score(self.history[-1])
+            self.evaluate_score(self.history.last())
 
             # check if game finish
             game_ongoing = not self.is_game_finished()
@@ -145,8 +146,8 @@ class Game:
 
         if valid:
             self.commit_and_redraw(move)
-            
-        self.redraw()
+            self.history.push(move)
+
         return valid
 
 
@@ -162,10 +163,14 @@ class Game:
             listen_keyboard(on_press=ask_user_move_callback)
 
             # special case: revert
-            if self.input_buffer == "backspace" and len(self.history) > 1:
-                move = self.history[-1]
-                move.rollback()
-                self.commit_and_redraw(move, pop=True)
+            if self.input_buffer == "backspace":
+                move = self.history.pop()
+                if move is not None:
+                    move.rollback()
+                    self.commit_and_redraw(move)
+                else:
+                    print("Nothing to rollback my friend.")
+                    
             else:
                 current_piece_coords = self.pending_piece.get_matrix_from_blocks()
                 move = MoveFactory.build(
@@ -183,6 +188,7 @@ class Game:
 
                 if valid:
                     self.commit_and_redraw(move)
+                    self.history.push(move)
                     return move
                 else:
                     print("Out of bound! Nice try...")
@@ -199,11 +205,6 @@ class Game:
             tile = self.board.tile(c[0], c[1])
             self.pending_piece.blocks[i].tile = tile
             tile.block = self.pending_piece.blocks[i]
-    
-        if pop is True:
-            self.history.pop()
-        else:
-            self.history.append(move)
 
         self.redraw()
 
@@ -222,7 +223,7 @@ class Game:
 
         if apply_if_possible and is_valid:
             self.commit_and_redraw(g)
-
+            self.history.push(g)
             return self.check_if_gravity_ongoing()
         else:
             return is_valid
