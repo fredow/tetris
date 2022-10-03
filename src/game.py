@@ -1,6 +1,8 @@
 # native libraries
 import copy
+from datetime import datetime
 import random
+import threading
 from time import sleep
 from typing import List
 
@@ -24,6 +26,13 @@ class Game:
     DEFAULT_BOARD_HEIGHT: int = 22
     input_buffer: str = ""
     score: int = 0
+    game_time: int = 0
+
+    #STATE_PROVISIONNING = 0
+    #STATE_RUNNING = 1
+    #STATE_FINISHED = 2
+
+    game_ongoing: bool
 
     def __init__(self, width: int = DEFAULT_BOARD_WIDTH, height: int = DEFAULT_BOARD_HEIGHT) -> None:
         
@@ -38,40 +47,35 @@ class Game:
         self.pending_piece = None
         self.score = 0
         self.board = Board(width, height)
+        self.game_time = 0
+        self.start_time = datetime.now()
+        self.game_ongoing = True
 
+    def game_runner(self):
 
-    def start(self) -> None:
-        print("Get ready.")
-        sleep(1)
-        print("Get set...")
-        sleep(1)
-        print("GO!")
-        sleep(1)
+        while self.game_ongoing:
 
-        game_ongoing = True
-        while game_ongoing:
-
-            success = self.generate_new_block()
-            
-            if not success: break
-            gravity_ongoing = self.check_if_gravity_ongoing()
-
+            gravity_ongoing = True
             while gravity_ongoing:
-
-                user_move = self.ask_user_move()
-
-                if isinstance(user_move, Move): 
-
-                    gravity_ongoing = self.check_if_gravity_ongoing(apply_if_possible=True)
+                self.ask_user_move()
 
 
-            # apply score
-            self.evaluate_score(self.history.last())
 
-            # check if game finish
-            game_ongoing = not self.is_game_finished()
-            if not game_ongoing:
-                print("ending")
+    def game_timer(self):
+        while self.game_ongoing:
+            sleep(1)
+            if self.pending_piece is None:
+                self.generate_new_block()
+                
+            if not self.check_if_gravity_ongoing(apply_if_possible=True):
+                
+                self.pending_piece = None
+
+                self.evaluate_score(self.history.last())
+
+                self.game_ongoing = not self.is_game_finished()
+                
+            self.redraw()
 
     
     # take the last move played, and check if there is some points
@@ -93,11 +97,6 @@ class Game:
         if row_filled:
             self.score += self.pending_piece.color
 
-            # O(N) instead of O(n2) by this trick, todo: would work if it was not objects
-            #top_line = [0] * self.board.width
-            #new_arr = [top_line] + self.board.grid[0:-1]
-            #self.board.grid = new_arr
-            
             for x in range(BUFFER, self.board.width + BUFFER):
                 t = self.board.tile(row_to_evaluate, x)
                 if t is not None:
@@ -170,7 +169,7 @@ class Game:
                     self.commit_and_redraw(move)
                 else:
                     print("Nothing to rollback my friend.")
-                    
+
             else:
                 current_piece_coords = self.pending_piece.get_matrix_from_blocks()
                 move = MoveFactory.build(
@@ -195,7 +194,7 @@ class Game:
 
 
                 
-    def commit_and_redraw(self, move: Move, pop=False):
+    def commit_and_redraw(self, move: Move):
         
         for b in self.pending_piece.blocks:
             if b.tile is not None: b.tile.block = None
@@ -229,19 +228,10 @@ class Game:
             return is_valid
 
 
-    def apply_gravity(self) -> Move:
-        tile = self.pending_piece.tile
-        tile_destination = self.board.tile(tile.y + 1, tile.x)
-
-        move = None
-        if tile_destination and tile_destination.piece is None:
-            move = Move(tile.piece, tile_destination)
-            self.apply_move(move)
-        
-        return move
-
     def redraw(self):
+        diff_time = datetime.now() - self.start_time
         utils.clear_terminal()
         print("Score: " + str(self.score))
+        print("Time: " + str(diff_time.seconds))
         self.board.redraw()
         print("Instructions:  \n- Press LEFT or RIGHT to move. \n- Press ENTER or DOWN) to skip. \n- Press BACKSPACE to rollback")

@@ -6,6 +6,7 @@ from typing import List
 
 BOARD_PADDING = 1
 
+
 # must be serializable and the most decoupled
 #@dataclass
 class Move (ABC):
@@ -44,6 +45,8 @@ class Move (ABC):
         reversed_state = self.apply_command(self.new_board_state, move_vector_command)
 
         self.destination_position = np.array(self.initial_position)
+        #if isinstance(self, MoveOrigin):
+            
 
         return reversed_state
 
@@ -84,7 +87,7 @@ class Move (ABC):
         # update global states
         # todo: problem with rotation for the o        self.new_board_state = np.array(beefedup_vector) + np.array(matrix)
         self.destination_position = np.array(self.initial_position) + self.get_matrice()
-        
+        self.new_board_state = matrix + beefedup_vector
 
 
         return self.new_board_state
@@ -185,24 +188,7 @@ class DownMove(Move):
     def get_matrice(self):
         return [1, 0]
 
-'''
-this is the initialization of a piec on the board, it's a move in a seense that it is spawning
 
-we need
-- y,x of the start of a piece
-- the vector of the piece
-- the initial state of the board
-'''
-class MoveOrigin(Move):
-
-    def __init__(self, piece_shape, board_state, initial_position) -> None:
-        super().__init__(piece_shape, initial_position)
-
-        self.board_state = board_state
-        print(self)
-
-    def get_matrice(self):
-        return []
 
 class RotateMove(Move):
 
@@ -240,6 +226,9 @@ class MoveFactory():
             move = RightMove(piece_shape, initial_position)
         elif move_str in ["enter", "esc", "down"]:
             move = DownMove(piece_shape, initial_position) 
+        elif move_str == "up":
+            print("Rotation available soon...")
+            return None
         else:
             return None
 

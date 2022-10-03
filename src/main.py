@@ -1,4 +1,7 @@
+
 import sys
+import threading
+from time import sleep
 
 import utils as utils
 from game import Game
@@ -19,9 +22,30 @@ def main(args = [str]):
     utils.clear_terminal()
 
     while True:
-        game = Game(width, height)
-        game.start()
         
+        
+        
+        print("Get ready.")
+        sleep(1)
+        print("Get set...")
+        sleep(1)
+        print("GO!")
+        sleep(1)
+
+        game = Game(width, height)
+        
+        game_runner = threading.Thread(target=game.game_runner)
+        game_runner.start()
+
+        game_timer = threading.Thread(target=game.game_timer)
+        game_timer.start()
+
+        game_runner.join()
+        game_timer.join()
+        
+        print(11111)
+        
+        #game_controller.join()
         print("Game done!")
         key = input("Want to play another one? Press ENTER to play again")
 
