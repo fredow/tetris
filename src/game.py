@@ -14,6 +14,7 @@ from move import Move, MoveFactory
 import numpy as np
 import utils
 
+BUFFER = 1
 class Game:
     board: Board = None
     pending_piece: Piece = None
@@ -80,9 +81,8 @@ class Game:
         else:
             row_to_evaluate: int = move.destination_position[0] + len(move.piece_shape) - 1
 
-        BUFFER  =1
         row_filled: bool = True
-        for i in range(1, self.board.width):
+        for i in range(BUFFER, self.board.width):
             tile = self.board.tile(row_to_evaluate, i)
             if tile and tile.block is None:
                 row_filled = False
@@ -115,9 +115,8 @@ class Game:
         
         # check if the row 0 (top) contains one piece, if yes then it's over
         game_over = False
-        BUFFER = 1
         for i in range(self.board.width):
-            t = self.board.tile(1, i)
+            t = self.board.tile(BUFFER, i)
             if t and t.block is not None:
                 game_over = True
         
@@ -132,43 +131,23 @@ class Game:
 
         #todo: will force a gap of 4 from the right which for the square will never allow it to be at the boarder
         random.seed()
-        # BUFFER
-        pos_x = random.randint(1, self.board.width - 5) 
-        #pos_x = 4
+        pos_x = random.randint(BUFFER, self.board.width - 5) 
         matrix = self.board.get_matrix()
         self.pending_piece = PieceFactory.build_rand()
         
         move = MoveFactory.build_first(
             self.pending_piece.vector,
-            matrix, 
-            [1, pos_x]
+            matrix, [1, pos_x]
         )
 
         # align the piece matrix with the random new position
         valid = self.board.verify_state(move.new_board_state)
 
         if valid:
-
-            #self.board.update_blocks_positions(
-            #    self.pending_piece, 
-            #    move.new_piece_positions
-            #)
             self.commit_and_redraw(move)
             
-            self.redraw()
-
-            return True
-        else:
-            self.redraw()
-            # todo: to support and test
-            return False
-
-            '''
-            initiate out of bounds to -2
-            if one of them has value of 2, illigale (on top of another piece)
-            if one of them has a value out of bound of -1, illigate
-            otherwise 
-            '''
+        self.redraw()
+        return valid
 
 
     def ask_user_move(self) -> Move:
@@ -182,76 +161,35 @@ class Game:
         while not played:    
             listen_keyboard(on_press=ask_user_move_callback)
 
-            current_piece_coords = self.pending_piece.get_matrix_from_blocks()
-            m = MoveFactory.build(
-                    self.input_buffer,
-                    self.pending_piece.vector,
-                    current_piece_coords[0])
+            # special case: revert
+            if self.input_buffer == "backspace" and len(self.history) > 1:
+                move = self.history[-1]
+                move.rollback()
+                self.commit_and_redraw(move, pop=True)
+            else:
+                current_piece_coords = self.pending_piece.get_matrix_from_blocks()
+                move = MoveFactory.build(
+                        self.input_buffer,
+                        self.pending_piece.vector,
+                        current_piece_coords[0])
 
-            if not isinstance(m, Move):
-                print("command not supported")
-                continue
+                if not isinstance(move, Move):
+                    print("Command '" + self.input_buffer  + "'not supported, maybe in v2!")
+                    continue
 
-            # check if this is a legal movement for the piece
-            if m.get_matrice() in self.pending_piece.get_possible_moves():
-                
                 # now try to apply the move and check if board is in a valid state
-                state = m.apply_command(self.board.get_matrix())
-                valid = self.board.verify_state(m.new_board_state)
+                move.apply_command(self.board.get_matrix())
+                valid = self.board.verify_state(move.new_board_state)
 
                 if valid:
-                    # commit the move on the board now
-                    # input: coords piece A, coords piece B
-                    #self.board.update_blocks_positions(
-                    #    self.pending_piece, 
-                    #    m.new_piece_positions
-                    #)
-                    self.commit_and_redraw(m)
-
-                    return m
+                    self.commit_and_redraw(move)
+                    return move
                 else:
-                    print("out of bound!")
+                    print("Out of bound! Nice try...")
 
-            else:
-                print("Illigal move!")
 
                 
-
-    '''
-    @depreciated
-    def validate_move(self, move: Move) -> bool:
-
-        # validate if the board is free to move there first
-        if move and move.destination and move.destination.piece is None:
-
-            # not allowed to move up or down
-            if move.destination.y == move.piece.tile.y:
-
-                # can only move 1 case at the time
-                if abs(move.destination.x - move.piece.tile.x) == 1:
-                    return True
-
-        return False'''
-
-    #@depreciated
-    '''def apply_move(self, move: Move):
-
-        # make change on the board here
-        if move.destination.y != move.piece.tile.y or move.destination.x != move.piece.tile.x:
-            
-            x = move.piece.tile.x
-            y = move.piece.tile.y
-            self.board.tile(move.destination.y, move.destination.x).set_piece(move.piece)
-            self.board.tile(y, x).set_piece(None)
-            self.pending_piece = move.piece
-
-            if self.pending_piece is None:
-                print(move)
-            self.history.append(move)
-            self.redraw()
-    '''
-    
-    def commit_and_redraw(self, move: Move):
+    def commit_and_redraw(self, move: Move, pop=False):
         
         for b in self.pending_piece.blocks:
             if b.tile is not None: b.tile.block = None
@@ -262,7 +200,11 @@ class Game:
             self.pending_piece.blocks[i].tile = tile
             tile.block = self.pending_piece.blocks[i]
     
-        self.history.append(move)
+        if pop is True:
+            self.history.pop()
+        else:
+            self.history.append(move)
+
         self.redraw()
 
     def check_if_gravity_ongoing(self, apply_if_possible = False) -> bool:
@@ -284,15 +226,7 @@ class Game:
             return self.check_if_gravity_ongoing()
         else:
             return is_valid
-        
-        '''tile = self.pending_piece.tile
-        next_destination = self.board.tile(tile.y + 1, tile.x)
-        if next_destination and next_destination.piece is None:
-            return True
-        else:
-            self.pending_piece = None
-            return False
-        '''
+
 
     def apply_gravity(self) -> Move:
         tile = self.pending_piece.tile
@@ -305,26 +239,8 @@ class Game:
         
         return move
 
-    '''
-    def apply_gravity_all(self):
-
-        tile_applied_gravity = []
-        for y in range(len(self.board.grid)):
-            for x in range(len(self.board.grid[y])):
-                tile = self.board.tile(y, x)
-                tile_destination = self.board.tile(y + 1, x)
-                if tile and tile.piece is not None and tile_destination and tile_destination.piece is None:
-                    
-                    if not tile in tile_applied_gravity:
-                        move = Move(tile.piece, tile_destination)
-                        tile_applied_gravity.append(tile_destination)
-                        print("Gravity for " + str(y) + "," + str(x))
-                        self.apply_move(move)
-    '''                    
-
-
     def redraw(self):
         utils.clear_terminal()
         print("Score: " + str(self.score))
         self.board.redraw()
-        print("Use arrows to make your move (LEFT or RIGHT) or press ENTER (or DOWN) to skip")
+        print("Instructions:  \n- Press LEFT or RIGHT to move. \n- Press ENTER or DOWN) to skip. \n- Press BACKSPACE to rollback")

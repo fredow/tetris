@@ -38,8 +38,14 @@ class Move (ABC):
     def get_matrice(self) -> List[int]:
         ...
 
-    def rollback(self, updated_coords):
-        return np.array(self.get_matrice()) *-1 + np.array(updated_coords)
+    def rollback(self):
+        move_vector_command = np.array(self.move_vector_command) * -1
+
+        reversed_state = self.apply_command(self.new_board_state, move_vector_command)
+
+        self.destination_position = np.array(self.initial_position)
+
+        return reversed_state
 
     ''' applies the vector on any given matrix. 
     the vector will need to be redimensionned to fit the matrice
@@ -52,14 +58,16 @@ class Move (ABC):
         self.new_board_state = np.array(self.move_vector_command) + np.array(matrix)
         return self.new_board_state
 
-    def apply_command(self, matrix):
+    def apply_command(self, matrix, vector=None):
         piece_position = self.initial_position
 
+        if vector is None:
+            vector = self.move_vector_command
         if matrix is None:
             matrix = self.initial_board_state
 
         # beef up the calculated vector with the actual bord to be able to do ops
-        beefedup_vector = self.move_vector_command
+        beefedup_vector = vector
         if piece_position[0] - BOARD_PADDING > 0:
             beefedup_vector = np.vstack([[[0] * len(beefedup_vector[0])] * (piece_position[0] - BOARD_PADDING), beefedup_vector])
         
@@ -82,9 +90,13 @@ class Move (ABC):
 
         return self.new_board_state
 
-    def undo_command(self):
-        reversed_state = np.array(self.move_vector_command) - np.array(self.new_board_state)
-        self.new_board_state = []
+    def undo_command(self, vector=None):
+
+        if vector is None:
+            vector = self.move_vector_command
+
+        reversed_state = np.array(vector) - np.array(self.new_board_state)
+        self.new_board_state = reversed_state
         return reversed_state
 
     def get_vector_coords(self, new_position=False):
@@ -100,10 +112,6 @@ class Move (ABC):
                     coords.append([y + origin[0], x + origin[1]])
 
         return coords
-
-    def apply(self):
-        return np.array(self.get_matrice()) + np.array(self.piece_shape)
-
 
     '''
     need the piece vector
@@ -232,7 +240,7 @@ class MoveFactory():
         elif move_str == "right":
             move = RightMove(piece_shape, initial_position)
         elif move_str in ["enter", "esc", "down"]:
-            move = DownMove(piece_shape, initial_position) #
+            move = DownMove(piece_shape, initial_position) 
         else:
             return None
 
