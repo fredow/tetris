@@ -37,16 +37,15 @@ def main(args = [str]):
         game_runner = threading.Thread(target=game.game_runner)
         game_runner.start()
 
-        game_timer = threading.Thread(target=game.game_timer)
-        game_timer.start()
+        game_ticker = threading.Thread(target=game.game_ticker)
+        game_ticker.start()
 
         game_runner.join()
-        game_timer.join()
+        game_ticker.join()
         sleep(1)
         
-        #game_controller.join()
         print("\n###############################\nGame done! Score: "+ str(game.score) +"\n###############################")
-        key = input("Want to play another one? Press ENTER to play again")
+        key = input("Want to play another one? Press ENTER to play again.\n")
 
         if key == "y" or key == "Y" or key == "":
             continue

@@ -1,9 +1,7 @@
 from dataclasses import dataclass
 from typing import List
-from pieces import Block, Piece
+from pieces.block import Block
 
-
-# start introducing matrices need to review OO 
 
 # either make the board depend on each title, and piece and moves depends on Tile
 # or make everything depends on board coords and have a helper tile class to support the coords
@@ -16,7 +14,7 @@ from pieces import Block, Piece
 class Tile:
     y: int = 0
     x: int = 0
-    block = None
+    block: Block = None
 
     
     TILE_STATE_OCCUPIED = 1
@@ -24,24 +22,13 @@ class Tile:
     TILE_STATE_OF_OF_BOUND = -1
     state: int = 0  
 
-    '''
-    def set_block(self, p: Piece):
-        self.piece = p
-        
-
-        if self.block is not None:
-            self.piece.tile = self
-            self.state = self.TILE_STATE_OCCUPIED
-        else:
-            self.state = self.TILE_STATE_EMPTY
-    '''
 
     def get_coords(self) -> List[int]:
         return [self.y, self.x]
 
     def __str__(self) -> str:
         if self.block:
-            return "[" + str(self.block.parent.color) + "]"
+            return "[" + str(self.block) + "]"
         else:
             return "[ ]"
 
@@ -50,7 +37,6 @@ class Tile:
             return True
                 
         return False
-
 
 
 @dataclass
@@ -79,15 +65,6 @@ class Board:
         return grid
 
     
-    # blocks_positions[[0,1], [5,5]]
-    # assyme len(blocks_positions) and nb blocks is same
-    #def update_blocks_positions(self, piece: Piece, blocks_positions):
-    #    for i, block in enumerate(piece.blocks):
-    #        block.tile = self.tile(blocks_positions[i][0], blocks_positions[i][1])
-
-    #    return piece.blocks
-
-
     # add padding for matrix operations
     def initialize_grid(self):
         grid = []
@@ -110,6 +87,7 @@ class Board:
             except Exception as e:
                 return None
         return None
+
 
     def get_matrix(self) -> List:
         matrix = []
@@ -169,3 +147,4 @@ class Board:
             ui += "\n"
 
         print(ui)
+

@@ -1,5 +1,5 @@
 import numpy as np
-from move import Move
+from moves.move import Move
 
 class LeftMove(Move):
     CONTROL = "left"
@@ -38,6 +38,10 @@ class MoveOrigin(Move):
 
     def get_matrice(self):
         return []
+
+    def calculate_vector(self, beefed_upmatrix=None):
+        self.move_vector_command = beefed_upmatrix
+
 
 class RotateMove(Move):
     CONTROL = "up"

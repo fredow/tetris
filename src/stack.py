@@ -1,6 +1,6 @@
 from typing import List
-from move import Move
-from moves import MoveOrigin
+from moves.move import Move
+from moves.move_children import MoveOrigin
 
 
 class MoveHistory:

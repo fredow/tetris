@@ -1,6 +1,5 @@
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 import numpy as np
 from typing import List
 
@@ -57,39 +56,11 @@ class Move (ABC):
     the vector will need to be redimensionned to fit the matrice
     its assumed that the dimensions of matrix needs to be a minimum = to the vector
     '''
-    def apply_command_first(self, matrix):
-        if matrix is None:
-            matrix = self.initial_board_state
-
-        self.new_board_state = np.array(self.move_vector_command) + np.array(matrix)
-        return self.new_board_state
 
     def apply_command(self, matrix, vector=None):
-        piece_position = self.initial_position
+      
+        beefedup_vector = self.resize_vector_to_match(matrix, vector)
 
-        if vector is None:
-            vector = self.move_vector_command
-        if matrix is None:
-            matrix = self.initial_board_state
-
-        if self.CONTROL == "origin":
-            print(222)
-
-        # beef up the calculated vector with the actual bord to be able to do ops
-        beefedup_vector = vector
-        if piece_position[0] - BOARD_PADDING > 0:
-            beefedup_vector = np.vstack([[[0] * len(beefedup_vector[0])] * (piece_position[0] - BOARD_PADDING), beefedup_vector])
-        
-        if len(matrix) - len(beefedup_vector) > 0:
-            beefedup_vector = np.vstack([beefedup_vector, [[0] * len(beefedup_vector[0])] * (len(matrix) - len(beefedup_vector)) ])
-        
-        if piece_position[1]:
-            for i in range(piece_position[1] - BOARD_PADDING): # for some reason the notation [[0] * 4] * X dont work
-                beefedup_vector = np.column_stack([[0] * len(beefedup_vector), beefedup_vector])
-            
-            for i in range(len(matrix[0]) - len(beefedup_vector[0])): 
-                beefedup_vector = np.column_stack([beefedup_vector, [0] * len(beefedup_vector)])
-        
         # update global states
         # todo: problem with rotation for the o        self.new_board_state = np.array(beefedup_vector) + np.array(matrix)        self.destination_position = np.array(self.initial_position) + self.get_matrice()
         self.new_board_state = matrix + beefedup_vector
@@ -98,8 +69,9 @@ class Move (ABC):
         pivot_point_translation = self.get_matrice()
         if pivot_point_translation:
             self.destination_position += self.get_matrice()
-            
+
         return self.new_board_state
+
 
     def undo_command(self, vector=None):
 
@@ -110,7 +82,7 @@ class Move (ABC):
         self.new_board_state = reversed_state
         return reversed_state
 
-    def get_vector_coords(self, new_position=False):
+    def get_vector_coords(self):
         coords = []
 
         origin = self.initial_position
@@ -124,29 +96,52 @@ class Move (ABC):
 
         return coords
 
-    '''
-    need the piece vector
-    
-    
-    '''
+    def resize_vector_to_match(self, matrix, vector_to_resize):
+        piece_position = self.initial_position
 
-    def add_padding_matrix(self, matrix):
+        if vector_to_resize is None:
+            vector_to_resize = self.move_vector_command
+        if matrix is None:
+            matrix = self.initial_board_state
+
+        # beef up the calculated vector with the actual bord to be able to do ops
+        # todo, need to know the more left pos, and the more right pos to fill it up dynamically, fails with rotation now
+        resized_vector = vector_to_resize
+        if piece_position[0] - BOARD_PADDING > 0:
+            resized_vector = np.vstack([[[0] * len(resized_vector[0])] * (piece_position[0] - BOARD_PADDING), resized_vector])
+        
+        if len(matrix) - len(resized_vector) > 0:
+            resized_vector = np.vstack([resized_vector, [[0] * len(resized_vector[0])] * (len(matrix) - len(resized_vector)) ])
+        
+        if piece_position[1]:
+            for i in range(piece_position[1] - BOARD_PADDING): # for some reason the notation [[0] * 4] * X dont work
+                resized_vector = np.column_stack([[0] * len(resized_vector), resized_vector])
+            
+            for i in range(len(matrix[0]) - len(resized_vector[0])): 
+                resized_vector = np.column_stack([resized_vector, [0] * len(resized_vector)])
+        
+        return resized_vector
+
+    def add_padding_to_matrix(self, matrix):
 
         # beef up matrice + 1 top and bottom and + 1 left and right
-        beefed_upmatrix = np.vstack([[[0] * len(matrix[0])], matrix])
-        beefed_upmatrix = np.vstack([beefed_upmatrix, [[0] * len(matrix[0])]])
+        padded_matrix = np.vstack([[[0] * len(matrix[0])], matrix])
+        padded_matrix = np.vstack([padded_matrix, [[0] * len(matrix[0])]])
         
-        beefed_upmatrix = np.column_stack([[0] * len(beefed_upmatrix), beefed_upmatrix])
-        beefed_upmatrix = np.column_stack([beefed_upmatrix, [0] * len(beefed_upmatrix)])
+        padded_matrix = np.column_stack([[0] * len(padded_matrix), padded_matrix])
+        padded_matrix = np.column_stack([padded_matrix, [0] * len(padded_matrix)])
 
-        return beefed_upmatrix
+        return padded_matrix
 
-    def calculate_vector(self, beefed_upmatrix):
+
+    # is override by moveorigine to support if len(move) = 0:
+    def calculate_vector(self, matrix):
 
         # create transformation matrix
         move = self.get_matrice()
-        coords = np.transpose(np.where(beefed_upmatrix==1))
-        transformation_matrix = beefed_upmatrix.copy()
+        
+        coords = np.transpose(np.where(matrix==1))
+        transformation_matrix = matrix.copy()
         transformation_matrix[np.where(transformation_matrix==1)] = 0
 
         # for each coords that cointain a block, apply the move 
@@ -155,30 +150,3 @@ class Move (ABC):
             transformation_matrix[point[0]][point[1]] -= 1
         
         self.move_vector_command = transformation_matrix
-
-
-    #fill the matrix based to match it with an existing one
-    def calculate_vector_first(self):
-
-        y_len = len(self.piece_shape)
-        x_len = len(self.piece_shape[0])
-
-        BUFFER = 1
-        nb_to_append_y = len(self.board_state) - y_len - self.initial_position[0]# - BUFFER
-        nb_to_append_x = len(self.board_state[0]) - x_len# - BUFFER
-
-        extended_matrix = np.vstack([[[0] * x_len] * self.initial_position[0], self.piece_shape])
-        extended_matrix = np.vstack([extended_matrix, [[0] * x_len] * nb_to_append_y])
-        
-        nb_columns_added = 0
-        for i in range(0, self.initial_position[1]):
-            if nb_columns_added < nb_to_append_x:
-                extended_matrix = np.column_stack([[0] * len(self.board_state), extended_matrix])
-                nb_columns_added += 1
-
-        # extend on the right for the remainings
-        for i in range(nb_to_append_x - nb_columns_added):
-            extended_matrix = np.column_stack([extended_matrix, [0] * len(self.board_state)])
-
-        self.move_vector_command = extended_matrix
-

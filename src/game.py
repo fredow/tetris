@@ -1,20 +1,20 @@
+import os
+print(os.getcwd())
+
 # native libraries
-import copy
 from datetime import datetime
 import random
-import threading
 from time import sleep
-from typing import List
 
 # installed libraries
 from sshkeyboard import listen_keyboard, stop_listening
 
 # app dependencies
-from pieces import Piece, PieceFactory
+from pieces.piece import Piece
+from pieces.piece_factory import PieceFactory
 from board import Board
-from move import Move
-from move_factory import MoveFactory
-import numpy as np
+from moves.move import Move
+from moves.move_factory import MoveFactory
 from stack import MoveHistory
 import utils
 
@@ -55,6 +55,7 @@ class Game:
         self.start_time = datetime.now()
         self.game_ongoing = True
 
+
     def game_runner(self):
         self.redraw()
         while self.game_ongoing:
@@ -69,13 +70,14 @@ class Game:
 
 
 
-    def game_timer(self):
+    def game_ticker(self):
         while self.game_ongoing:
             
+            valid_piece = True
             if self.pending_piece is None:
-                self.generate_new_block()
-                
-            if not self.check_if_gravity_ongoing(apply_if_possible=True):
+                valid_piece = self.generate_new_piece()
+            
+            if not valid_piece or not self.check_if_gravity_ongoing(apply_if_possible=True):
                 
                 self.pending_piece = None
 
@@ -84,7 +86,7 @@ class Game:
                 self.game_ongoing = not self.is_game_finished()
                 
             #self.redraw()
-            sleep(1)
+            sleep(0.1)
 
     
     # take the last move played, and check if there is some points
@@ -136,7 +138,7 @@ class Game:
     randomly move it on the x axis
     if the move is illigale it means the game is done
     '''
-    def generate_new_block(self):
+    def generate_new_piece(self):
 
         #todo: will force a gap of 4 from the right which for the square will never allow it to be at the boarder
         random.seed()
@@ -144,10 +146,8 @@ class Game:
         matrix = self.board.get_matrix()
         self.pending_piece = PieceFactory.build_rand()
         
-        move = MoveFactory.build_first(
-            self.pending_piece.vector,
-            matrix, [1, pos_x]
-        )
+        move = MoveFactory.build(None, self.pending_piece.vector, [1, pos_x])
+        move.apply_command(matrix)
 
         # align the piece matrix with the random new position
         valid = self.board.verify_state(move.new_board_state)
@@ -183,11 +183,16 @@ class Game:
                     print("Nothing to rollback my friend.")
 
             else:
-                current_piece_coords = self.pending_piece.get_matrix_from_blocks()
-                move = MoveFactory.build(
-                        self.input_buffer,
-                        self.pending_piece.vector,
-                        current_piece_coords[0])
+                # try catch statement to prevent race conditions for when current block is null, controlled by the ticker
+                try:
+
+                    current_piece_coords = self.pending_piece.get_matrix_from_blocks()
+                    move = MoveFactory.build(
+                            self.input_buffer,
+                            self.pending_piece.vector,
+                            current_piece_coords[0])
+                except Exception:
+                    return move
 
                 if not isinstance(move, Move):
                     print("Command '" + self.input_buffer  + "'not supported, maybe in v2!")
