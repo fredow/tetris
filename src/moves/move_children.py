@@ -31,10 +31,9 @@ class MoveOrigin(Move):
         super().__init__(piece_shape, initial_position)
 
         self.board_state = board_state
-        print(self)
 
     def custom_rollback(self):
-        print("bye!")
+        pass
 
     def get_matrice(self):
         return []

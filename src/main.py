@@ -34,13 +34,13 @@ def main(args = [str]):
 
         game = Game(width, height)
         
-        game_runner = threading.Thread(target=game.game_runner)
-        game_runner.start()
+        game_console = threading.Thread(target=game.game_console)
+        game_console.start()
 
         game_ticker = threading.Thread(target=game.game_ticker)
         game_ticker.start()
 
-        game_runner.join()
+        game_console.join()
         game_ticker.join()
         sleep(1)
         

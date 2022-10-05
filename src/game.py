@@ -18,7 +18,6 @@ from moves.move_factory import MoveFactory
 from stack import MoveHistory
 import utils
 
-BUFFER = 1
 class Game:
     
     POINTS_PER_LINE = 100
@@ -30,11 +29,6 @@ class Game:
     DEFAULT_BOARD_HEIGHT: int = 22
     input_buffer: str = ""
     score: int = 0
-    game_time: int = 0
-
-    #STATE_PROVISIONNING = 0
-    #STATE_RUNNING = 1
-    #STATE_FINISHED = 2
 
     game_ongoing: bool
 
@@ -51,12 +45,11 @@ class Game:
         self.pending_piece = None
         self.score = 0
         self.board = Board(width, height)
-        self.game_time = 0
         self.start_time = datetime.now()
         self.game_ongoing = True
 
 
-    def game_runner(self):
+    def game_console(self):
         self.redraw()
         while self.game_ongoing:
 
@@ -71,6 +64,7 @@ class Game:
 
 
     def game_ticker(self):
+        self.redraw()
         while self.game_ongoing:
             
             valid_piece = True
@@ -85,8 +79,11 @@ class Game:
 
                 self.game_ongoing = not self.is_game_finished()
                 
-            #self.redraw()
-            sleep(0.1)
+            
+            sleep(0.5)
+
+        # unblock the user listener thread
+        stop_listening()
 
     
     # take the last move played, and check if there is some points
@@ -98,7 +95,7 @@ class Game:
             row_to_evaluate: int = move.destination_position[0] + len(move.piece_shape) - 1
 
         row_filled: bool = True
-        for i in range(BUFFER, self.board.width):
+        for i in range(self.board.PADDING_BUFFER, self.board.width):
             tile = self.board.tile(row_to_evaluate, i)
             if tile and tile.block is None:
                 row_filled = False
@@ -108,7 +105,7 @@ class Game:
         if row_filled:
             self.score += self.POINTS_PER_LINE
 
-            for x in range(BUFFER, self.board.width + BUFFER):
+            for x in range(self.board.PADDING_BUFFER, self.board.width + self.board.PADDING_BUFFER):
                 t = self.board.tile(row_to_evaluate, x)
                 if t is not None:
                     if t.block is not None:
@@ -117,8 +114,8 @@ class Game:
 
             # move all the piece down 1 row, delete the last row pieces and initialize the first row
             if row_to_evaluate > 0:
-                for y in range(row_to_evaluate, BUFFER, -1):
-                    for x in range(BUFFER, self.board.width + BUFFER):
+                for y in range(row_to_evaluate, self.board.PADDING_BUFFER, -1):
+                    for x in range(self.board.PADDING_BUFFER, self.board.width + self.board.PADDING_BUFFER):
                         self.board.tile(y, x).block = self.board.tile(y - 1, x).block                
 
 
@@ -127,7 +124,7 @@ class Game:
         # check if the row 0 (top) contains one piece, if yes then it's over
         game_over = False
         for i in range(self.board.width):
-            t = self.board.tile(BUFFER, i)
+            t = self.board.tile(self.board.PADDING_BUFFER, i)
             if t and t.block is not None:
                 game_over = True
         
@@ -142,7 +139,7 @@ class Game:
 
         #todo: will force a gap of 4 from the right which for the square will never allow it to be at the boarder
         random.seed()
-        pos_x = random.randint(BUFFER, self.board.width - 5) 
+        pos_x = random.randint(self.board.PADDING_BUFFER, self.board.width - 5) 
         matrix = self.board.get_matrix()
         self.pending_piece = PieceFactory.build_rand()
         
@@ -211,10 +208,11 @@ class Game:
 
 
                 
-    def commit_and_redraw(self, move: Move):
+    def commit_and_redraw(self, move: Move, ignore_current_piece=False):
         
-        for b in self.pending_piece.blocks:
-            if b.tile is not None: b.tile.block = None
+        if not ignore_current_piece:
+            for b in self.pending_piece.blocks:
+                if b.tile is not None: b.tile.block = None
 
         coords = move.get_vector_coords()
         for i, c in enumerate(coords):
@@ -244,6 +242,12 @@ class Game:
         else:
             return is_valid
 
+    # todo: unsupported
+    def replay_game(self):
+
+        self.board = Board() 
+        for move in self.history:
+            self.commit_and_redraw(move)
 
     def redraw(self):
         diff_time = datetime.now() - self.start_time

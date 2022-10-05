@@ -42,6 +42,7 @@ class Tile:
 @dataclass
 class Board:
     
+    PADDING_BUFFER = 1
     width: int = 5
     height: int = 5
     grid = None
